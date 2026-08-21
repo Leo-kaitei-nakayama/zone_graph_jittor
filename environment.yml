@@ -1,0 +1,15 @@
+name: zonegraph-jittor
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - freecad
+  - numpy<2
+  - networkx
+  - trimesh
+  - joblib
+  - matplotlib
+  - gxx_linux-64
+  - pip
+  - pip:
+      - jittor
