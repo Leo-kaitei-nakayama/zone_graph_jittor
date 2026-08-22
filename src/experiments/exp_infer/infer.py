@@ -2,22 +2,22 @@ import sys
 from os.path import dirname, realpath
 sys.path.append('../..')
 
-import numpy as np
 import os
 import argparse
-import numpy as np
-
-from dataset import *
-from search import *
-from utils.file_utils import *
 import time
-from agent import Agent
 import shutil
 import multiprocessing
 
 # from utils.vis_utils import *
 
 def infer(seq_id, sort_option, data_path, max_time, max_step):
+    # heavy imports live here, not at module level: spawned children
+    # re-import this module during bootstrap, and importing jittor there
+    # (which starts its own compile workers) is forbidden mid-bootstrap
+    from pathlib import Path
+    from dataset import DataManager
+    from search import SearchSolution, dfs_best_recon
+    from agent import Agent
 
     if sort_option == 'random':
         folder =  str(sort_option)
@@ -70,6 +70,10 @@ def infer_all(sort_option, data_path, max_time, max_step):
 
 processed_data_folder = "../processed_files/processed_data/"
 if __name__ == "__main__":
+    # each per-sequence subprocess builds an Agent; CUDA contexts do not
+    # survive fork(), so forked children die with cudaErrorInitializationError
+    # on GPU machines — spawn starts them fresh instead
+    multiprocessing.set_start_method('spawn', force=True)
     parser = argparse.ArgumentParser()
     parser.add_argument('--option', default='heur', type=str, help='infer option')
     parser.add_argument('--data_path', default='../../../data/fusion_processed', type=str)
