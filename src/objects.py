@@ -167,6 +167,9 @@ class ZoneGraph:
         state['target_shape'] = self.target_shape.exportBrepToString() if self.target_shape else None
         state['faces'] = [f.exportBrepToString() for f in self.faces]
         state['planes'] = [p.exportBrepToString() for p in self.planes]
+        # bbox is a Part.Solid too — without this joblib.dump of any built
+        # ZoneGraph fails with "cannot pickle 'Part.Solid' object"
+        state['bbox'] = self.bbox.exportBrepToString() if self.bbox is not None else None
         # zones自体はZoneオブジェクトのリストなので、Zone側のgetstateが自動で使われます
         return state
 
@@ -180,6 +183,10 @@ class ZoneGraph:
             shape = Part.Shape()
             shape.importBrepFromString(self.target_shape)
             self.target_shape = shape
+        if self.bbox:
+            shape = Part.Shape()
+            shape.importBrepFromString(self.bbox)
+            self.bbox = shape
 
         new_faces = []
         for f_str in self.faces:

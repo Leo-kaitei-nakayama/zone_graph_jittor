@@ -50,9 +50,12 @@ raw = os.path.join(work, 'raw')
 processed = os.path.join(work, 'processed')
 seq_id = 'synthetic_L'
 
-# ---- 1. synthesize the raw sequence: L = box1 (z 0..0.5) + box2 on top ----
+# ---- 1. synthesize the raw sequence: base slab + corner block on top ----
+# box2 must not span the full x extent: a constant cross-section target is
+# detected as a generalized cylinder, whose side faces split space as one
+# closed loop — and the two GT boxes are then not unions of zones.
 box1 = Part.makeBox(1.0, 1.0, 0.5)
-box2 = Part.makeBox(1.0, 0.5, 0.5, Base.Vector(0, 0, 0.5))
+box2 = Part.makeBox(0.5, 0.5, 0.5, Base.Vector(0, 0, 0.5))
 target = box1.fuse(box2).removeSplitter()
 
 def write_step(step, current, extrusion):
