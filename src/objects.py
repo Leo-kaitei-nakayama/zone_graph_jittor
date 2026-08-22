@@ -188,18 +188,22 @@ class ZoneGraph:
             shape.importBrepFromString(self.bbox)
             self.bbox = shape
 
+        # importBrepFromString yields a generic Part.Shape; face methods the
+        # proposer needs (curvatureAt, normalAt, tangentAt) live on Part.Face,
+        # so unwrap to the contained Face — otherwise get_proposals crashes
+        # on any ZoneGraph reloaded from joblib
         new_faces = []
         for f_str in self.faces:
             shape = Part.Shape()
             shape.importBrepFromString(f_str)
-            new_faces.append(shape)
+            new_faces.append(shape.Faces[0])
         self.faces = new_faces
 
         new_planes = []
         for p_str in self.planes:
             shape = Part.Shape()
             shape.importBrepFromString(p_str)
-            new_planes.append(shape)
+            new_planes.append(shape.Faces[0])
         self.planes = new_planes
         
     def copy(self):
