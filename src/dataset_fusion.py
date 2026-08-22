@@ -159,7 +159,15 @@ class FusionDataManager:
             picked = self.pairs[num]
             self.num += 1
 
-            res = self.get_data_by_pair(picked)
+            # corrupt STEP files raise from OCC (e.g. "shape is invalid" on
+            # .Volume); one bad model must not kill the whole dataset pass —
+            # the step-index gap it leaves makes load_raw_sequence drop that
+            # sequence later with wrong_load_length
+            try:
+                res = self.get_data_by_pair(picked)
+            except Exception as e:
+                print('skipping invalid model pair', picked[1], ':', e)
+                res = None
             if res:
                 return num, res
             else:
@@ -216,8 +224,12 @@ def preprocess_fusion_data(fusion_path, extrusion_path, processed_fusion_path, r
         model_dir = f"{fusion_path}{model_id}.step"
 
         final_cad_shape = Part.Shape()
-        final_cad_shape.read(model_dir)
-        bbox = final_cad_shape.BoundBox
+        try:
+            final_cad_shape.read(model_dir)
+            bbox = final_cad_shape.BoundBox
+        except Exception as e:
+            print('skipping extrusions for invalid model', model_id, ':', e)
+            continue
         bbox_data = str(bbox).split('BoundBox (')[1].split(')')[0].split(',')
         bbox_data = [float(item) for item in bbox_data]
         w = bbox_data[3]-bbox_data[0]
@@ -237,21 +249,21 @@ def preprocess_fusion_data(fusion_path, extrusion_path, processed_fusion_path, r
         print('Processing Extrusion: ', i, model_dir)
 
         for j,ext in enumerate(exts):
-            ext_shape = Part.Shape()
-            ext_shape.read(ext)
-
-            # normalize model location
-            if (reposition):
-                ext_shape.translate(move_vector)
-
-            # normalize model scale
-            ext_shape.scale(scale_factor, Base.Vector(0, 0, 0))
-
-            out_dir = f"{file}/{j}/extrusion.stp"
             try:
+                ext_shape = Part.Shape()
+                ext_shape.read(ext)
+
+                # normalize model location
+                if (reposition):
+                    ext_shape.translate(move_vector)
+
+                # normalize model scale
+                ext_shape.scale(scale_factor, Base.Vector(0, 0, 0))
+
+                out_dir = f"{file}/{j}/extrusion.stp"
                 ext_shape.exportStep(out_dir)
-            except:
-                pass
+            except Exception as e:
+                print('skipping invalid extrusion', ext, ':', e)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
