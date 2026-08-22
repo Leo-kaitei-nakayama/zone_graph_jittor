@@ -10,6 +10,7 @@ from dataset import *
 from objects import *
 from proposal import *
 import multiprocessing
+import time
 import shutil
 import matplotlib.pyplot as plt
 import copy
@@ -144,24 +145,38 @@ def process_single_data(seq_id, raw_data_path, processed_data_path):
 
     print('single data processing complete !')
 
-def process(raw_data_path, processed_data_path):   
+def process(raw_data_path, processed_data_path, workers=1):
 
     if not os.path.exists(processed_data_path):
         os.makedirs(processed_data_path)
 
-    seq_ids = os.listdir(raw_data_path)
-    for seq_id in seq_ids:
-        sequence_length = len(list(Path(os.path.join(raw_data_path, seq_id)).glob('*')))
-        print('sequence_length', sequence_length)
+    # sequences are independent, so run up to `workers` of them at once;
+    # each keeps the original 200 + 100*len second kill deadline
+    pending = sorted(os.listdir(raw_data_path))
+    active = []
 
-        worker_process = multiprocessing.Process(target=process_single_data, name="process_single_data", args=(seq_id, raw_data_path, processed_data_path))
-        worker_process.start()
-        worker_process.join(200 + sequence_length * 100)
-        
-        if worker_process.is_alive():
-            print ("process_single_data is running... let's kill it...")
-            worker_process.terminate()
-            worker_process.join()
+    while pending or active:
+        while pending and len(active) < workers:
+            seq_id = pending.pop(0)
+            sequence_length = len(list(Path(os.path.join(raw_data_path, seq_id)).glob('*')))
+            print('sequence_length', sequence_length)
+            worker_process = multiprocessing.Process(target=process_single_data, name="process_single_data", args=(seq_id, raw_data_path, processed_data_path))
+            worker_process.start()
+            active.append((worker_process, time.time() + 200 + sequence_length * 100, seq_id))
+
+        time.sleep(1)
+
+        remaining = []
+        for worker_process, deadline, seq_id in active:
+            if not worker_process.is_alive():
+                worker_process.join()
+            elif time.time() > deadline:
+                print("process_single_data is running... let's kill it...", seq_id)
+                worker_process.terminate()
+                worker_process.join()
+            else:
+                remaining.append((worker_process, deadline, seq_id))
+        active = remaining
 
     print('all data processing complete !')
 
@@ -185,9 +200,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='train_preprocess')
     parser.add_argument('--data_path', default='../data/fusion_processed', type=str)
     parser.add_argument('--output_path', default='processed_data', type=str)
+    parser.add_argument('--workers', default=1, type=int)
     args = parser.parse_args()
 
     split_data_for_training(args.data_path)
-    process(args.data_path, args.output_path)
+    process(args.data_path, args.output_path, args.workers)
 
 
