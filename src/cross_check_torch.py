@@ -126,13 +126,20 @@ x_np = rng.random((N, 10, P)).astype('float32')
 h_np = rng.random((N, 128)).astype('float32')
 adj = build_adj_norm(N, edges)
 
-# populate non-trivial BatchNorm running statistics before copying
+# populate non-trivial BatchNorm running statistics before copying; the
+# net's head is warmed with a multi-row batch since train-mode BatchNorm
+# rejects the [1,128] a single-graph readout produces
 t_enc, t_net = TorchZoneEncoder(128), TorchGraphNet(128, 2)
 t_mp = TorchMPLayer(128, 128)
 with torch.no_grad():
     for _ in range(3):
         t_enc(torch.from_numpy(rng.random((N, 10, P)).astype('float32')))
-        t_net(torch.from_numpy(rng.random((N, 128)).astype('float32')), nbrs)
+        h_w = torch.from_numpy(rng.random((N, 128)).astype('float32'))
+        h_w = t_net.post_mp1(t_net.mp1(h_w, nbrs))
+        h_w = t_net.post_mp2(t_net.mp2(h_w, nbrs))
+        t_net.mp3(h_w, nbrs)
+        head = torch.from_numpy(rng.random((4, 128)).astype('float32'))
+        t_net.fc_final(t_net.fc2(t_net.fc1(head)))
         t_mp(torch.from_numpy(rng.random((N, 128)).astype('float32')), nbrs)
 t_enc.eval(); t_net.eval(); t_mp.eval()
 
