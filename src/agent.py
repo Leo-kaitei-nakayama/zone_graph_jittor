@@ -77,19 +77,32 @@ class Agent():
         return h, adj_norm
 
     def make_decision(self, g_encs):
-        # replaces dgl.batch: concatenate node features, block-diagonal
-        # adjacency, per-graph node counts for the readout
+        # replaces dgl.batch: concatenate node features, per-graph node
+        # counts for the readout, and one adjacency for the whole batch
         sizes = [enc[0].shape[0] for enc in g_encs]
-        total = sum(sizes)
-        A = np.zeros((total, total), dtype='float32')
-        start = 0
-        for h_i, adj_i in g_encs:
-            k = adj_i.shape[0]
-            A[start:start + k, start:start + k] = adj_i
-            start += k
-
         h = jt.concat([enc[0] for enc in g_encs], dim=0)
-        prob = self.decision_maker(h, jt.array(A), graph_sizes=sizes)
+
+        # Ranking candidates of a single zone graph (evaluation, and the
+        # common case) reuses one topology, so pass that [N, N] alone —
+        # MPLayer applies it per graph. A block-diagonal matrix here would
+        # be (B*N)^2 and reaches tens of GB at a few hundred candidates.
+        first = g_encs[0][1]
+        shared = all(enc[1] is first or
+                     (enc[1].shape == first.shape and np.array_equal(enc[1], first))
+                     for enc in g_encs)
+        if shared:
+            adj = jt.array(first)
+        else:
+            total = sum(sizes)
+            A = np.zeros((total, total), dtype='float32')
+            start = 0
+            for h_i, adj_i in g_encs:
+                k = adj_i.shape[0]
+                A[start:start + k, start:start + k] = adj_i
+                start += k
+            adj = jt.array(A)
+
+        prob = self.decision_maker(h, adj, graph_sizes=sizes)
         prob = jt.exp(prob)
         return prob
 

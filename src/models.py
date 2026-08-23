@@ -118,7 +118,17 @@ class MPLayer(nn.Module):
         # outgoing edge; here BatchNorm sees each node once. Identical in
         # eval mode, slightly different batch statistics while training.
         msg = self.fc2(self.fc1(h))
-        agg = jt.matmul(adj_norm, msg)
+        n = adj_norm.shape[0]
+        if msg.shape[0] == n:
+            agg = jt.matmul(adj_norm, msg)
+        else:
+            # Shared-adjacency batch: every candidate extrusion of one zone
+            # graph has identical topology, so instead of a block-diagonal
+            # [B*N, B*N] matrix (48GB at a few hundred candidates) apply the
+            # single [N, N] to a [B, N, C] stack. Same arithmetic, and the
+            # concatenated layout means BatchNorm still sees all B*N rows.
+            b = msg.shape[0] // n
+            agg = jt.matmul(adj_norm, msg.reshape((b, n, -1))).reshape((msg.shape[0], -1))
         return self.linear(agg)
 
 
