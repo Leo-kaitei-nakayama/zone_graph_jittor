@@ -128,6 +128,17 @@ class Agent():
 
         return loss.item()
 
+    def eval(self):
+        # the released torch code never switched the nets out of training
+        # mode, so BatchNorm normalized with batch statistics even while
+        # ranking; call this for deterministic, batch-independent scores
+        self.zone_encoder.eval()
+        self.decision_maker.eval()
+
+    def train(self):
+        self.zone_encoder.train()
+        self.decision_maker.train()
+
     def save_weights(self):
         self.zone_encoder.save(os.path.join(self.folder, "zone_encoder.pkl"))
         self.decision_maker.save(os.path.join(self.folder, "decision_maker.pkl"))
