@@ -32,6 +32,13 @@ FEAT_DIM = 128
 
 
 def torch_state_to_numpy(path):
+    # .npz lets the conversion run in an environment without torch: dump the
+    # checkpoints from the torch environment first with
+    #   python -c "import torch,numpy as np; sd=torch.load('best_zone_encoder.pkl',map_location='cpu'); \
+    #              np.savez('best_zone_encoder.npz', **{k:v.numpy() for k,v in sd.items()})"
+    if path.endswith('.npz'):
+        with np.load(path) as z:
+            return {k: z[k] for k in z.files if not k.endswith('num_batches_tracked')}
     import torch
     sd = torch.load(path, map_location='cpu')
     return {k: v.detach().numpy() for k, v in sd.items()
@@ -42,6 +49,8 @@ def convert(torch_dir, out_dir, best=False, verify=False, point_num=500):
     prefix = 'best_' if best else ''
     enc_path = os.path.join(torch_dir, prefix + 'zone_encoder.pkl')
     dm_path = os.path.join(torch_dir, prefix + 'decision_maker.pkl')
+    if not os.path.exists(enc_path) and os.path.exists(enc_path[:-4] + '.npz'):
+        enc_path, dm_path = enc_path[:-4] + '.npz', dm_path[:-4] + '.npz'
 
     enc_state = torch_state_to_numpy(enc_path)
     dm_state = torch_state_to_numpy(dm_path)
