@@ -45,6 +45,7 @@ import os
 import argparse
 import random
 import shutil
+import signal
 
 import numpy as np
 import joblib
@@ -145,11 +146,23 @@ def train_step(agent, zone_graph, candidates, gt_index):
     return loss.item()
 
 
-def cached_proposals(cache_dir, seq_id, step_index, zone_graph):
+class _ProposalTimeout(Exception):
+    pass
+
+
+def _raise_proposal_timeout(signum, frame):
+    raise _ProposalTimeout()
+
+
+def cached_proposals(cache_dir, seq_id, step_index, zone_graph, timeout=0):
     """get_proposals depends only on the zone graph geometry, never on the
     network, so each (sequence, step)'s proposal list is computed once and
-    reused by every later epoch and by validation. A failure caches an empty
-    list so the bad step is skipped cheaply forever after."""
+    reused by every later epoch and by validation. A failure — or exceeding
+    `timeout` seconds; some pathological graphs take extremely long, which is
+    why the original preprocessing carried its own time limits — caches an
+    empty list so the bad step is skipped cheaply forever after. The timeout
+    uses SIGALRM, so it only applies on the main thread (where training
+    runs) and fires once Python bytecode is executing."""
     path = None
     if cache_dir:
         path = os.path.join(cache_dir, '%s_%d.joblib' % (seq_id, step_index))
@@ -159,7 +172,18 @@ def cached_proposals(cache_dir, seq_id, step_index, zone_graph):
             except Exception:
                 pass
     try:
-        extrusions = get_proposals(zone_graph)
+        if timeout:
+            signal.signal(signal.SIGALRM, _raise_proposal_timeout)
+            signal.alarm(timeout)
+        try:
+            extrusions = get_proposals(zone_graph)
+        finally:
+            if timeout:
+                signal.alarm(0)
+    except _ProposalTimeout:
+        print('proposals timed out (>%ds) for %s step %d - skipping this step'
+              % (timeout, seq_id, step_index))
+        extrusions = []
     except Exception as e:
         print('proposals failed for', seq_id, 'step', step_index, ':', e)
         extrusions = []
@@ -171,7 +195,7 @@ def cached_proposals(cache_dir, seq_id, step_index, zone_graph):
     return extrusions
 
 
-def validate(agent, data_path, cache_dir, limit=0):
+def validate(agent, data_path, cache_dir, limit=0, timeout=0):
     """Rank sum of the GT extrusion over the validation set — the same
     quantity train.py's validate() computes — used only to pick the best
     checkpoint. One deliberate difference: the networks are switched to eval
@@ -193,7 +217,8 @@ def validate(agent, data_path, cache_dir, limit=0):
         for step_index, (zone_graph, gt_extrusion) in enumerate(gt_seq):
             if gt_extrusion is None:
                 continue
-            extrusions = cached_proposals(cache_dir, seq_id, step_index, zone_graph)
+            extrusions = cached_proposals(cache_dir, seq_id, step_index, zone_graph,
+                                          timeout=timeout)
             if len(extrusions) < 2:
                 continue
             gt_hash = gt_extrusion.hash()
@@ -253,7 +278,8 @@ def train(args):
             for step_index, (zone_graph, gt_extrusion) in enumerate(gt_seq):
                 if gt_extrusion is None:
                     continue
-                extrusions = cached_proposals(args.cache_path, seq_id, step_index, zone_graph)
+                extrusions = cached_proposals(args.cache_path, seq_id, step_index, zone_graph,
+                                              timeout=args.proposal_timeout)
                 if len(extrusions) < 2:
                     continue
                 cap = candidate_cap(zone_graph.zone_graph.number_of_nodes(),
@@ -281,7 +307,7 @@ def train(args):
         write_list_to_file(os.path.join(args.output_path, 'trainloss.txt'), train_loss_list)
 
         validation_loss = validate(agent, args.data_path, args.cache_path,
-                                   args.validate_limit)
+                                   args.validate_limit, args.proposal_timeout)
         validation_loss_list.append(validation_loss)
         write_list_to_file(os.path.join(args.output_path, 'validationloss.txt'),
                            validation_loss_list)
@@ -311,6 +337,10 @@ if __name__ == "__main__":
                         help='max training sequences per epoch, for quick trials; 0 = all')
     parser.add_argument('--validate_limit', default=0, type=int,
                         help='max validation sequences per epoch; 0 = all')
+    parser.add_argument('--proposal_timeout', default=600, type=int,
+                        help='seconds allowed per proposal generation; a step exceeding '
+                             'it is skipped (and cached as skipped). 0 disables. The '
+                             'original preprocessing used time limits for the same reason')
     parser.add_argument('--cache_path', default='proposal_cache', type=str,
                         help='on-disk proposal cache reused across epochs and runs; empty string disables')
     parser.add_argument('--seed', default=0, type=int)

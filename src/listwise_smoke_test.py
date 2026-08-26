@@ -118,6 +118,26 @@ check("huge graph floors at 2", candidate_cap(5000, 64, 4000) == 2)
 check("budget disabled -> plain cap", candidate_cap(5000, 64, 0) == 64)
 check("no caps at all -> large", candidate_cap(50, 0, 0) >= 10 ** 6)
 
+# 3c. proposal timeout and cache round-trip (uses the real joblib if present)
+import time
+import train_listwise as tl
+if hasattr(sys.modules['joblib'], 'dump') and sys.modules['joblib'].dump is not None:
+    tmpcache = tempfile.mkdtemp()
+    orig_get_proposals = tl.get_proposals
+    tl.get_proposals = lambda zg: time.sleep(5)
+    t0 = time.time()
+    res = tl.cached_proposals(tmpcache, 'slow_seq', 0, None, timeout=1)
+    check("slow proposals time out to empty", res == [] and time.time() - t0 < 3,
+          "%.1fs" % (time.time() - t0))
+    tl.get_proposals = lambda zg: ['p1', 'p2']
+    tl.cached_proposals(tmpcache, 'ok_seq', 0, None, timeout=1)
+    tl.get_proposals = lambda zg: (_ for _ in ()).throw(RuntimeError('cache miss'))
+    check("proposals served from cache", tl.cached_proposals(tmpcache, 'ok_seq', 0, None) == ['p1', 'p2'])
+    check("timed-out step cached as skipped", tl.cached_proposals(tmpcache, 'slow_seq', 0, None) == [])
+    tl.get_proposals = orig_get_proposals
+else:
+    print("SKIP proposal cache checks (joblib stubbed)")
+
 # 4. a few listwise steps drive the GT to rank 1
 agent.train()
 agent.optim_extrusion.lr = 1e-3
