@@ -95,6 +95,20 @@ def listwise_loss(agent, g_encs, gt_index):
     return -nn.log_softmax(scores, dim=1)[0, gt_index]
 
 
+def candidate_cap(num_zones, max_candidates, max_nodes):
+    """Memory guard: one update's activations scale with num_zones *
+    num_candidates (every candidate re-encodes every zone with gradients
+    held), so on top of the fixed --max_candidates cap, bound the total
+    node count of the batch. The floor of 2 (GT + one negative) is the base
+    recipe's scale, which fits any graph the base trainer could handle.
+    Negatives are resampled every epoch, so a heavily capped step still
+    sees different negatives each time."""
+    cap = max_candidates if max_candidates else 10 ** 9
+    if max_nodes:
+        cap = min(cap, max_nodes // max(1, num_zones))
+    return max(2, cap)
+
+
 def subsample_candidates(extrusions, gt_hash, max_candidates):
     """Bound the per-update candidate list. The GT is always kept; negatives
     are drawn uniformly and freshly on every call, so across epochs the
@@ -242,8 +256,10 @@ def train(args):
                 extrusions = cached_proposals(args.cache_path, seq_id, step_index, zone_graph)
                 if len(extrusions) < 2:
                     continue
+                cap = candidate_cap(zone_graph.zone_graph.number_of_nodes(),
+                                    args.max_candidates, args.max_nodes)
                 candidates, gt_index = subsample_candidates(
-                    extrusions, gt_extrusion.hash(), args.max_candidates)
+                    extrusions, gt_extrusion.hash(), cap)
                 if candidates is None:
                     continue
                 loss = train_step(agent, zone_graph, candidates, gt_index)
@@ -285,6 +301,10 @@ if __name__ == "__main__":
     parser.add_argument('--epochs', default=hp.train_epoch_num, type=int)
     parser.add_argument('--max_candidates', default=64, type=int,
                         help='cap per-update candidate list (GT always kept, negatives resampled each epoch); 0 = no cap')
+    parser.add_argument('--max_nodes', default=4000, type=int,
+                        help='GPU memory guard: cap candidates so candidates * zones '
+                             'stays under this node budget (floor of 2 candidates); '
+                             '0 disables. Lower it if training still runs out of memory')
     parser.add_argument('--lr', default=0.0, type=float,
                         help='override learning rate; 0 keeps hyperparameters.learning_rate_optim_extrusion')
     parser.add_argument('--limit', default=0, type=int,

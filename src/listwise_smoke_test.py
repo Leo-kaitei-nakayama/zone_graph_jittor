@@ -36,7 +36,7 @@ from objects import Zone, ZoneGraph, Extrusion, zone_sample_num
 from agent import Agent
 from evaluation import sort_extrusions_by_agent
 from train_listwise import (batched_log_probs, listwise_loss,
-                            subsample_candidates, train_step)
+                            subsample_candidates, train_step, candidate_cap)
 
 rng = np.random.default_rng(0)
 jt.set_global_seed(0)
@@ -110,6 +110,13 @@ sub_all, idx_all = subsample_candidates(list(candidates), gt_hash, 0)
 check("no cap keeps all candidates", len(sub_all) == len(candidates))
 missing = subsample_candidates(list(candidates), make_extrusion([0, 1, 2], 1).hash(), 3)
 check("missing GT -> (None, None)", missing == (None, None))
+
+# 3b. node-budget memory guard
+check("small graph keeps full cap", candidate_cap(50, 64, 4000) == 64)
+check("large graph shrinks cap", candidate_cap(400, 64, 4000) == 10)
+check("huge graph floors at 2", candidate_cap(5000, 64, 4000) == 2)
+check("budget disabled -> plain cap", candidate_cap(5000, 64, 0) == 64)
+check("no caps at all -> large", candidate_cap(50, 0, 0) >= 10 ** 6)
 
 # 4. a few listwise steps drive the GT to rank 1
 agent.train()
