@@ -108,8 +108,13 @@ class Zone:
         if self.cad_shape:
             shape = Part.Shape()
             shape.importBrepFromString(self.cad_shape)
-            self.cad_shape = shape
-    
+            # importBrepFromString yields a generic Part.Shape; solid methods
+            # (CenterOfMass, used by assign_face_labels) live on Part.Solid,
+            # so unwrap — same treatment as faces/planes in ZoneGraph.
+            # Without this, update_to_next_zone_graph fails on any reloaded
+            # zone graph.
+            self.cad_shape = shape.Solids[0] if shape.Solids else shape
+
     def cal_inside_points(self):
         inside_points = []
 
