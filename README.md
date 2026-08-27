@@ -3,6 +3,10 @@
 Jittor port of [zone_graph_fix](https://github.com/leo-kaitei-nakayama/zone_graph_fix)
 ("Inferring CAD Modeling Sequences Using Zone Graphs", CVPR 2021).
 
+See **[REPORT.md](REPORT.md)** for the full reproduction report: port
+verification, Fusion360 results, why the released training recipe misses
+the paper's Fig. 6 network number, and the listwise fix.
+
 ## Layout: baseline vs experiments
 
 The repository keeps a strict separation so the baseline stays a faithful
