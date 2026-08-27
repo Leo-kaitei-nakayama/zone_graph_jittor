@@ -96,11 +96,21 @@ def train(args):
 
     gs = []
     ls = []
+    batch_nodes = 0
+
+    def flush_batch():
+        nonlocal gs, ls, batch_nodes
+        if gs:
+            loss = agent.update_by_extrusion(ls, gs)
+            train_loss_list.append(loss)
+            gs, ls, batch_nodes = [], [], 0
+
     for epoch_index in range(args.epochs):
         print('epoch', epoch_index, '--------------------------------------------')
         used = 0
         labeled_steps = 0
         skipped_unlabeled = 0
+        skipped_large = 0
         for seq_id in train_ids:
             try:
                 gt_seq = data_mgr.load_processed_sequence(
@@ -126,15 +136,22 @@ def train(args):
                                               zone_graph, timeout=args.proposal_timeout)
                 if not extrusions:
                     continue
+                # GPU memory guard: a batch's activations scale with its total
+                # zone count, so bound both the graph size and the batch's node
+                # total. (The base recipe never met the giant graphs — their
+                # negative mining timed out, silently dropping those steps.)
+                n_zones = zone_graph.zone_graph.number_of_nodes()
+                if args.max_zones and n_zones > args.max_zones:
+                    skipped_large += 1
+                    continue
                 for g, label in step_examples(zone_graph, gt_extrusion, extrusions,
                                               labels['neg_hashes'], args.max_negatives):
+                    if gs and (len(gs) >= hp.batch_size or
+                               batch_nodes + n_zones > args.max_batch_nodes):
+                        flush_batch()
                     gs.append(g)
                     ls.append(to_tensor([label]))
-                    if len(gs) >= hp.batch_size:
-                        loss = agent.update_by_extrusion(ls, gs)
-                        gs = []
-                        ls = []
-                        train_loss_list.append(loss)
+                    batch_nodes += n_zones
                 labeled_steps += 1
                 seq_used = True
             if seq_used:
@@ -154,8 +171,8 @@ def train(args):
                 if args.limit and used >= args.limit:
                     break
 
-        print('epoch %d done: %d labeled steps used, %d steps still unlabeled'
-              % (epoch_index, labeled_steps, skipped_unlabeled))
+        print('epoch %d done: %d labeled steps used, %d unlabeled, %d over max_zones'
+              % (epoch_index, labeled_steps, skipped_unlabeled, skipped_large))
         agent.save_weights()
         write_list_to_file(os.path.join(args.output_path, 'trainloss.txt'), train_loss_list)
         run_validation()
@@ -178,6 +195,11 @@ if __name__ == "__main__":
                         help='override learning rate; 0 keeps the base recipe value')
     parser.add_argument('--max_negatives', default=0, type=int,
                         help='cap negatives per step (resampled each epoch); 0 = all, as the paper')
+    parser.add_argument('--max_zones', default=1000, type=int,
+                        help='skip steps whose zone graph exceeds this many zones; 0 disables')
+    parser.add_argument('--max_batch_nodes', default=4000, type=int,
+                        help='flush the batch early once its total zone count would exceed '
+                             'this GPU memory budget; 0 disables')
     parser.add_argument('--limit', default=0, type=int)
     parser.add_argument('--validate_limit', default=0, type=int)
     parser.add_argument('--validate_every', default=1000, type=int,
