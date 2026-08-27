@@ -300,6 +300,19 @@ def train(args):
                     write_list_to_file(os.path.join(args.output_path, 'trainloss.txt'),
                                        train_loss_list)
                     agent.save_weights()
+                # per-step updates make the validation curve noisy, so an
+                # epoch-end-only check can miss the best weights; optionally
+                # validate mid-epoch too and keep the best seen anywhere
+                if args.validate_every and used % args.validate_every == 0:
+                    validation_loss = validate(agent, args.data_path, args.cache_path,
+                                               args.validate_limit, args.proposal_timeout)
+                    validation_loss_list.append(validation_loss)
+                    write_list_to_file(os.path.join(args.output_path, 'validationloss.txt'),
+                                       validation_loss_list)
+                    if validation_loss <= min_validation_loss:
+                        min_validation_loss = validation_loss
+                        agent.save_best_weights()
+                        print('new best checkpoint (validation rank sum %d)' % validation_loss)
                 if args.limit and used >= args.limit:
                     break
 
@@ -337,6 +350,9 @@ if __name__ == "__main__":
                         help='max training sequences per epoch, for quick trials; 0 = all')
     parser.add_argument('--validate_limit', default=0, type=int,
                         help='max validation sequences per epoch; 0 = all')
+    parser.add_argument('--validate_every', default=0, type=int,
+                        help='additionally validate (and update the best checkpoint) every '
+                             'N training sequences within an epoch; 0 = epoch end only')
     parser.add_argument('--proposal_timeout', default=600, type=int,
                         help='seconds allowed per proposal generation; a step exceeding '
                              'it is skipped (and cached as skipped). 0 disables. The '
