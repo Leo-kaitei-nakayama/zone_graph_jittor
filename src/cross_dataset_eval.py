@@ -177,8 +177,9 @@ def main():
     scratch = os.path.join(args.out_dir, 'search_out')
     os.makedirs(scratch, exist_ok=True)
 
-    files = sorted(glob.glob(os.path.join(args.step_dir, '**', '*.st*p'), recursive=True))
-    files = [f for f in files if f.lower().endswith(('.step', '.stp'))]
+    files = sorted(glob.glob(os.path.join(args.step_dir, '**', '*.*'), recursive=True))
+    # FreeCAD's Shape.read handles STEP, IGES and native BREP by extension
+    files = [f for f in files if f.lower().endswith(('.step', '.stp', '.brep'))]
     print('found %d step files' % len(files))
     random.seed(args.seed)
     random.shuffle(files)
