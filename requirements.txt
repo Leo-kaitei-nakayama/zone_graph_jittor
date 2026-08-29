@@ -1,0 +1,13 @@
+# Core (src/ is pure Jittor — no torch, no dgl)
+jittor==1.3.11.0
+numpy
+networkx
+trimesh
+joblib
+
+# FreeCAD is not pip-installable: install via conda
+#   conda install -c conda-forge freecad
+# and set FREECAD_LIB_PATH (see src/setup.py).
+
+# Optional, only for tools/torch_reference/ (numerical comparison
+# against the original implementation): torch

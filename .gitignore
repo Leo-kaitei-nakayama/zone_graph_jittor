@@ -2,3 +2,15 @@ __pycache__/
 *.pyc
 *.joblib
 *.pkl
+*.log
+nohup.out
+processed_data/
+processed_fusion*/
+train_output*/
+proposal_cache/
+ternary_labels*/
+crossdata_*/
+src/experiments/exp_infer/random/
+src/experiments/exp_infer/heur/
+src/experiments/exp_infer/agent/
+*_ids.txt
