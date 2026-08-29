@@ -112,7 +112,30 @@ changing only the objective, reaching the paper's *heuristic* level
 (0.070) and confirming the diagnosis. It does not yet beat the (unusually
 strong, easy-distribution) heuristic of this reproduction (0.044).
 
-## 5. Conclusions
+## 5. Cross-dataset generalization
+
+Using `src/cross_dataset_eval.py` (Fusion360-trained checkpoints, 300
+random shapes per dataset, Table 7 protocol: normalize → build zone graph
+→ 120s best-first search; reconstructed = IoU ≥ 0.99):
+
+| dataset | heur | agent | build failed |
+|---|---|---|---|
+| Fusion360 r1.0.0 (home) | **77.7%** | 70.3% | 12.3% |
+| HistCAD-Fusion360 | 72.7% | 63.0% | 17.3% |
+| HistCAD-DeepCAD | 68.7% | 65.0% | 27.7% |
+| WHUCAD (B-Rep) | 60.0% | 53.0% | 21.0% |
+
+Findings: (a) the home row matches the paper's Table 7 (80%) under the
+same protocol, resolving the apparent 54%-vs-80% gap (54% was the
+stricter training-preprocessing funnel, the paper's own comparable figure
+being 60%); (b) generalization degrades gracefully, dominated by zone
+graph construction failures and, on WHUCAD, by non-extrusion features
+outside the method's vocabulary — of buildable HistCAD-DeepCAD shapes,
+98.1% reconstruct perfectly; (c) the heuristic beats the network on every
+dataset (4–10 pp), so the learned ranker is the main cross-dataset
+bottleneck, consistent with the Fig. 6 findings above.
+
+## 6. Conclusions
 
 1. The Jittor port is numerically faithful to the released PyTorch code
    and is the appropriate baseline for method comparisons.
@@ -126,7 +149,7 @@ strong, easy-distribution) heuristic of this reproduction (0.044).
    labeling, hard-negative-aware sampling, training listwise from
    scratch, or richer geometric features. Left as future work.
 
-## Reproducing
+## 7. Reproducing
 
 ```
 # baseline (released recipe, faithful port)
