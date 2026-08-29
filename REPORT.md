@@ -112,6 +112,16 @@ changing only the objective, reaching the paper's *heuristic* level
 (0.070) and confirming the diagnosis. It does not yet beat the (unusually
 strong, easy-distribution) heuristic of this reproduction (0.044).
 
+We also re-implemented the paper's own Sec. 5.2 ternary labeling
+faithfully (`src/ternary_label.py` + `src/train_ternary.py`: every
+zero-completion-probability proposal labeled negative via random
+completions, neutrals excluded, base focal loss): trained from scratch
+with a per-step negative cap of 8, it scores **0.146** — the best
+validation rank sum of any run but the worst test relative rank,
+overfitting the many small candidate sets while undertraining the large
+ones. Neither the released recipe, listwise, nor the described ternary
+scheme reaches the paper's 0.036.
+
 ## 5. Cross-dataset generalization
 
 Using `src/cross_dataset_eval.py` (Fusion360-trained checkpoints, 300
