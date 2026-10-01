@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 *.joblib
 *.pkl
+!checkpoints/**/*.pkl
 *.log
 nohup.out
 processed_data/

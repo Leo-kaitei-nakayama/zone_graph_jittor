@@ -93,5 +93,12 @@ python cross_dataset_eval.py --out_dir <crossdata_*> --summary_only
 python smoke_test.py
 ```
 
+## Pretrained checkpoints
+
+Trained weights live in `checkpoints/` (`baseline/`, `listwise/`, `ternary/`;
+`best_zone_encoder.pkl` + `best_decision_maker.pkl` each). See
+`checkpoints/README.md` for what each one is, its Fig. 6 score, and how to
+load, evaluate or continue training from it.
+
 Run-time artifacts (`processed_data/`, `train_output*/`, `proposal_cache/`,
 `crossdata_*/`, `*.log`) are intentionally not part of the repository.
