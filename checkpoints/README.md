@@ -6,6 +6,7 @@ saved by the trainers as `best_zone_encoder.pkl` (~0.3 MB) and
 
 | Folder | Recipe (script) | Fig. 6 average relative rank of the network (lower is better) |
 |---|---|---|
+| `baseline_from_torch/` | the 9-epoch baseline trained with the original PyTorch code (zone_graph_fix), converted key-for-key to Jittor by `tools/torch_reference/convert_torch_checkpoint.py` (max weight difference 0.0) | 0.107 (measured with torch) |
 | `baseline/` | released recipe (`train.py`) | 0.111 |
 | `listwise/` | listwise softmax loss (`train_listwise.py`) | 0.074 |
 | `listwise_ft/` | low-lr fine-polish of `listwise/` | 0.080 |
