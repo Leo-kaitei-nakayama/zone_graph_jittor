@@ -7,7 +7,8 @@ saved by the trainers as `best_zone_encoder.pkl` (~0.3 MB) and
 | Folder | Recipe (script) | Fig. 6 average relative rank of the network (lower is better) |
 |---|---|---|
 | `baseline/` | released recipe (`train.py`) | 0.111 |
-| `listwise/` | listwise softmax loss (`train_listwise.py`) | about 0.07 |
+| `listwise/` | listwise softmax loss (`train_listwise.py`) | 0.074 |
+| `listwise_ft/` | low-lr fine-polish of `listwise/` | 0.080 |
 | `ternary/` | paper Sec. 5.2 ternary labels (`train_ternary.py`) | 0.146 |
 
 For reference the paper reports 0.036; the random / heuristic baselines of our
@@ -37,3 +38,6 @@ python train_listwise.py --init_from ../checkpoints/listwise --output_path train
 ```
 
 (`train_ternary.py` accepts the same `--init_from`.)
+
+The cross-dataset table in `REPORT.md` was produced with the `baseline/` weights
+(`cross_dataset_eval.py --train_output ../checkpoints/baseline`).
