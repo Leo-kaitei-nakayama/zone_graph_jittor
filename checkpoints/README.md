@@ -12,6 +12,9 @@ saved by the trainers as `best_zone_encoder.pkl` (~0.3 MB) and
 | `listwise_ft/` | low-lr fine-polish of `listwise/` | 0.080 |
 | `ternary/` | paper Sec. 5.2 ternary labels (`train_ternary.py`) | 0.146 |
 
+Folders listed here but not present in the repository have not been copied off the
+training server yet.
+
 For reference the paper reports 0.036; the random / heuristic baselines of our
 evaluation are 0.398 / 0.044.
 
